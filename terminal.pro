@@ -21,4 +21,6 @@ FORMS += \
 
 RESOURCES += \
     terminal.qrc
-CONFIG+= static
+CONFIG += static
+
+QMAKE_LFLAGS += -static-libgcc -static-libstdc++ -static -pthread

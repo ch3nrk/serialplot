@@ -41,6 +41,7 @@
 #include <QLabel>
 #include <QtSerialPort/QSerialPort>
 
+#define ROZ 12 //wielkosc ramki
 //! [0]
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
@@ -49,7 +50,8 @@ MainWindow::MainWindow(QWidget *parent) :
 //! [0]
     ui->setupUi(this);
     setGeometry(400, 250, 542, 390);
-    //setupRealtimeData(ui->customPlot);
+
+    setupRealtimeData(ui->customPlot2);
     setupPlot(ui->customPlot);
 //! [1]
     serial = new QSerialPort(this);
@@ -67,10 +69,13 @@ MainWindow::MainWindow(QWidget *parent) :
     ui->statusBar->addWidget(status);
 
     initActionsConnections();
+    setupchannelbox();
+
     timer = new QTimer(this);
     connect(timer, SIGNAL(timeout()), this, SLOT(updateHz()));
     timer->start(1000);
     Hz_tmp=0;
+    for(int i=0;i<12;i++) pomiar[i]=0;
 
     connect(serial, static_cast<void (QSerialPort::*)(QSerialPort::SerialPortError)>(&QSerialPort::error),
             this, &MainWindow::handleError);
@@ -111,8 +116,7 @@ void MainWindow::openSerialPort()
         showStatusMessage(tr("Connected to %1 : %2, %3, %4, %5, %6")
                           .arg(p.name).arg(p.stringBaudRate).arg(p.stringDataBits)
                           .arg(p.stringParity).arg(p.stringStopBits).arg(p.stringFlowControl));
-        writeData("rstrt");
-        flaga_rstrt=1;
+        writeData("reset");
 
     } else {
         QMessageBox::critical(this, tr("Error"), serial->errorString());
@@ -144,7 +148,6 @@ void MainWindow::setupRealtimeData(QCustomPlot *customPlot)
   QMessageBox::critical(this, "", "You're using Qt < 4.7, the realtime data demo needs functions that are available with Qt 4.7 to work properly");
 #endif
 
-
   // include this section to fully disable antialiasing for higher performance:
   /*
   customPlot->setNotAntialiasedElements(QCP::aeAll);
@@ -154,93 +157,74 @@ void MainWindow::setupRealtimeData(QCustomPlot *customPlot)
   customPlot->yAxis->setTickLabelFont(font);
   customPlot->legend->setFont(font);
   */
-  customPlot->addGraph(); // blue line
-  customPlot->graph(0)->setPen(QPen(Qt::blue));
-  customPlot->graph(0)->setBrush(QBrush(QColor(240, 255, 200)));
-  customPlot->graph(0)->setAntialiasedFill(false);
-  customPlot->addGraph(); // red line
-  customPlot->graph(1)->setPen(QPen(Qt::red));
-  customPlot->graph(0)->setChannelFillGraph(customPlot->graph(1));
-/**/
-  customPlot->addGraph(); // blue dot
-  customPlot->graph(2)->setPen(QPen(Qt::blue));
-  customPlot->graph(2)->setLineStyle(QCPGraph::lsNone);
-  customPlot->graph(2)->setScatterStyle(QCPScatterStyle::ssDisc);
-  customPlot->addGraph(); // red dot
-  customPlot->graph(3)->setPen(QPen(Qt::red));
-  customPlot->graph(3)->setLineStyle(QCPGraph::lsNone);
-  customPlot->graph(3)->setScatterStyle(QCPScatterStyle::ssDisc);
 
+  for(int i=0;i<12;i++){
+      customPlot->addGraph();
+      customPlot->graph(i)->setVisible(0);
+      customPlot->graph(i)->removeFromLegend();
+  }
+      customPlot->graph(0)->setPen(QPen(Qt::blue));
+      customPlot->graph(0)->setName("Cz 1");
+      customPlot->graph(1)->setPen(QPen(Qt::red));
+      customPlot->graph(1)->setName("Cz 2");
+      customPlot->graph(2)->setPen(QPen(Qt::green));
+      customPlot->graph(2)->setName("Cz 3");
+      customPlot->graph(3)->setPen(QPen(Qt::yellow));
+      customPlot->graph(3)->setName("Cz 4");
+      customPlot->graph(4)->setPen(QPen(Qt::cyan));
+      customPlot->graph(4)->setName("Cz 5");
+      customPlot->graph(5)->setPen(QPen(Qt::black));
+      customPlot->graph(5)->setName("Cz 6");
+      customPlot->graph(6)->setPen(QPen(Qt::magenta));
+      customPlot->graph(6)->setName("Cz 7");
+      customPlot->graph(7)->setPen(QPen(Qt::darkRed));
+      customPlot->graph(7)->setName("Cz 8");
+      customPlot->graph(8)->setPen(QPen(Qt::darkBlue));
+      customPlot->graph(8)->setName("Cz 9");
+      customPlot->graph(9)->setPen(QPen(Qt::darkGreen));
+      customPlot->graph(9)->setName("Cz 10");
+      customPlot->graph(10)->setPen(QPen(Qt::gray));
+      customPlot->graph(10)->setName("Cz 11");
+      customPlot->graph(11)->setPen(QPen(Qt::darkCyan));
+      customPlot->graph(11)->setName("Cz 12");
+
+  customPlot->legend->setVisible(true);
   customPlot->xAxis->setTickLabelType(QCPAxis::ltDateTime);
   customPlot->xAxis->setDateTimeFormat("hh:mm:ss");
   customPlot->xAxis->setAutoTickStep(false);
   customPlot->xAxis->setTickStep(2);
   customPlot->axisRect()->setupFullAxesBox();
+  customPlot->yAxis->setRange(-10,100);
+  customPlot->yAxis->setLabel("nacisk 0.1 [N]");
 
-  // make left and bottom axes transfer their ranges to right and top axes:
-  connect(customPlot->xAxis, SIGNAL(rangeChanged(QCPRange)), customPlot->xAxis2, SLOT(setRange(QCPRange)));
-  connect(customPlot->yAxis, SIGNAL(rangeChanged(QCPRange)), customPlot->yAxis2, SLOT(setRange(QCPRange)));
   customPlot->setInteractions(QCP::iRangeDrag | QCP::iRangeZoom | QCP::iSelectPlottables);
-  // setup a timer that repeatedly calls MainWindow::realtimeDataSlot:
-//  connect(&dataTimer, SIGNAL(timeout()), this, SLOT(realtimeDataSlot()));
-//  dataTimer.start(0); // Interval 0 means to refresh as fast as possible
+  // make left and bottom axes transfer their ranges to right and top axes:
+  //connect(customPlot->xAxis, SIGNAL(rangeChanged(QCPRange)), customPlot->xAxis2, SLOT(setRange(QCPRange)));
+ // connect(customPlot->yAxis, SIGNAL(rangeChanged(QCPRange)), customPlot->yAxis2, SLOT(setRange(QCPRange)));
+
 }
 
-void MainWindow::realtimeData()
+void MainWindow::realtimeData(QCustomPlot *customPlot)
 {
   // calculate two new data points:
 #if QT_VERSION < QT_VERSION_CHECK(4, 7, 0)
   double key = 0;
 #else
   double key = QDateTime::currentDateTime().toMSecsSinceEpoch()/1000.0;
-#endif/*
+#endif
 
-  if (key-lastPointKey > 0.01) // at most add point every 10 ms
-  {
- */
-    //static double lastPointKey = 0;
-    double value0 = pomiar[0]; //qSin(key*1.6+qCos(key*1.7)*2)*10 + qSin(key*1.2+0.56)*20 + 26;
-    //double value1 = pomiar[1]; //qSin(key*1.3+qCos(key*1.2)*1.2)*7 + qSin(key*0.9+0.26)*24 + 26;
-    // add data to lines:
-    ui->customPlot->graph(0)->addData(key, value0);
-   // ui->customPlot->graph(1)->addData(key, value1);
-    // set data of dots:
-   /* ui->customPlot->graph(2)->clearData();
-    ui->customPlot->graph(2)->addData(key, value0);
-    ui->customPlot->graph(3)->clearData();
-    ui->customPlot->graph(3)->addData(key, value1);
-*/     // remove data of lines that's outside visible range:
-    ui->customPlot->graph(0)->removeDataBefore(key-8);
-    ui->customPlot->graph(1)->removeDataBefore(key-8);
-    // rescale value (vertical) axis to fit the current data:
-    ui->customPlot->graph(0)->rescaleValueAxis();
-    ui->customPlot->graph(1)->rescaleValueAxis(true);
-   // lastPointKey = key;
- // }
-  // make key axis range scroll with the data (at a constant range size of 8):
-    ui->customPlot->xAxis->setRange(key+0.25, 8, Qt::AlignRight);
-   // ui->customPlot->graph(0)->rescaleAxes();
-    ui->customPlot->replot();
+    for(int i=0;i<12;i++){
 
-  // calculate frames per second:
-  static double lastFpsKey;
-  static int frameCount;
-  ++frameCount;
-  if (key-lastFpsKey > 2) // average fps over 2 seconds
-  {
-    ui->statusBar->showMessage(
-          QString("%1 Hz, Total Data points: %2")
-          .arg(frameCount/(key-lastFpsKey), 0, 'f', 0)
-          .arg(ui->customPlot->graph(0)->data()->count()+ui->customPlot->graph(1)->data()->count())
-          , 0);
-    lastFpsKey = key;
-    frameCount = 0;
-  }
+        customPlot->graph(i)->addData(key,pomiar[i]);
+        customPlot->graph(i)->removeDataBefore(key-8);
+    }
+
+    customPlot->xAxis->setRange(key+0.25, 8, Qt::AlignRight);
+
+    customPlot->replot();
 }
 
-
-void MainWindow::setupPlot(QCustomPlot *customPlot){
-
+/*stare ::setupPlot
   customPlot->addGraph();
 
   customPlot->graph(0)->setPen(QPen(Qt::transparent));
@@ -256,19 +240,88 @@ void MainWindow::setupPlot(QCustomPlot *customPlot){
   customPlot->xAxis->setRange(0, 12);
 
   customPlot->xAxis->setScaleType(QCPAxis::stLinear);
-  customPlot->yAxis->setRange(-1, 190);
-  customPlot->yAxis->setLabel("");
+  customPlot->yAxis->setRange(-10, 100);
+  customPlot->yAxis->setLabel("nacisk 0.1 [N]");
   //customPlot->xAxis->setVisible(false);
+*/
+
+void MainWindow::setupPlot(QCustomPlot *customPlot){
+
+    for(int i=0;i<12;i++){//os x sie nie zmienia, os y zerowa
+
+        QVector<double> tmp = QVector<double>() <<i+1;
+        data_x.append(tmp);
+    }
+
+    for(int i=0;i<12;i++){
+
+        QCPBars *bar = new QCPBars(customPlot->xAxis, customPlot->yAxis);
+        bar->setAntialiased(false);
+        bar->setWidth(0.94);
+        plot_bars.append(bar);
+    }
+
+    customPlot->xAxis->setRange(0, 13);
+    customPlot->yAxis->setRange(-10, 150);
+    customPlot->yAxis->setLabel("nacisk 0.1 [N]");
+
+    linia=new QCPItemLine(customPlot);
+    linia->setPen(QPen(Qt::black));
+    linia->start->setCoords(0,0);
+    linia->end->setCoords(13,0);
+
 }
+
+/*
+
+    QCPBars *bars = new QCPBars(customPlot->xAxis, customPlot->yAxis);
+    bars->setData(datax1, datay1);
+
+    bars->setBrush(QColor(238,0,0,150));//czerwony
+    bars->setPen(QColor(238,0,0));
+
+    bars1->setBrush(QColor(1,139,0,150));//zielony
+    bars1->setPen(QColor(1,139,0));
+
+    bars->setBrush(QColor(205,173,0,150));//zolty
+    bars->setPen(QColor(205,173,0));
+
+*/
 
 void MainWindow::update(){
 
+    if(!ui->tabWidget->currentIndex()){
+
+        for(int i=0;i<12;i++){
+
+            QVector<double> tmp = QVector<double>()<<pomiar[i];
+
+            (plot_bars.at(i))->clearData();
+            (plot_bars.at(i))->setData(data_x.at(i),tmp);
+
+            if(pomiar[i]>ui->verticalSlider->value()){
+
+                (plot_bars.at(i))->setBrush(QColor(1,139,0,150));//zielony
+                (plot_bars.at(i))->setPen(QColor(1,139,0));
+            }
+            else{
+
+                (plot_bars.at(i))->setBrush(QColor(205,173,0,150));//zolty
+                (plot_bars.at(i))->setPen(QColor(205,173,0));
+            }
+        }
+
+        ui->customPlot->replot();
+    }
+    else realtimeData(ui->customPlot2);
+}
+/*stare ::update
     QVector<double> x(13), y(13);
 
     for (int i=0; i<12; i++){
 
-        x[i] = i;
-        y[i+1] = pomiar[i];
+        x[i] = i+1;
+        y[i] = pomiar[i];
         //qDebug()<<"x:"<<x[i]<<" y:"<<y[i];
     }
 
@@ -276,15 +329,20 @@ void MainWindow::update(){
     ui->customPlot->graph(0)->setData(x, y);
     //ui->customPlot->graph(0)->rescaleAxes();
     ui->customPlot->replot();
-}
-
+*/
 
 void MainWindow::Clear(){
 
-    ui->customPlot->graph(0)->clearData();
-    //ui->customPlot->graph(1)->clearData();
+    for(int i=0;i<12;i++){
+
+        ui->customPlot2->graph(i)->clearData();
+        (plot_bars.at(i))->clearData();
+    }
+
     ui->customPlot->replot();
+    ui->customPlot2->replot();
 }
+
 
 void MainWindow::Save(){
 
@@ -295,110 +353,81 @@ void MainWindow::Save(){
     a++;
     plik.setFileName(nazwa+".txt");
     if(!plik.open(QFile::WriteOnly|QFile::Text)) QMessageBox::information(this,"bład","nie utworzono pliku");
+    elapsed_timer.restart();
 }
+
 
 void MainWindow::stopSave(){
 
     ui->actionstopSave->setVisible(false);
     ui->actionSave->setVisible(true);
     plik.close();
+
 }
+
 
 void MainWindow::readData(){
 
-    Data=serial->readAll();
-    //qDebug()<<Data;
-    Buffer+=QString::fromStdString(Data.toStdString());
+    Data=serial->readAll();qDebug()<<Data;
 
-    QTextStream out(&plik);
-    //qDebug()<<Buffer;
-        
-    if((Buffer.startsWith("a")&&(Buffer.contains("x")&&(!flaga_rstrt)))){
+    Buffer+=QString::fromStdString(Data.toStdString());
+    //qDebug()<<"Buffer";qDebug()<<Buffer;
+
+
+
+    if((Buffer.startsWith("a")&&(Buffer.contains("x")))){
 
         int ilosc=Buffer.count('x');//ilosc ramek danych
-        int miejsce=Buffer.lastIndexOf('x'); 
-        qDebug()<<"ilosc:"<<ilosc;
-
-        QString tmp;
+        int miejsce=Buffer.lastIndexOf('x');   qDebug()<<"ilosc:"<<ilosc;
+        
+        Hz_tmp=Hz_tmp+ilosc;
+        
         QString reszta;
-
+               
         if(Buffer.size()>miejsce){//przerzucamy niepełny koniec buferu na pocztek nowego
 
             reszta=Buffer.mid(miejsce+1);
-            Buffer=Buffer.left(miejsce+1);
-            Buffer=Buffer.replace("x",",");
-            //qDebug()<<"reszta";qDebug()<<reszta;
+
+            Buffer=Buffer.left(miejsce); //qDebug()<<"reszta";qDebug()<<reszta;
         }
 
         Buffer.remove('a');
-        QStringList split_buffer= Buffer.split(",",QString::SkipEmptyParts);
-        //qDebug()<<split_buffer;
 
-        Hz_tmp=Hz_tmp+ilosc;
+        QStringList buffered= Buffer.split("x",QString::SkipEmptyParts);
 
-        for(int i=0;i<ilosc_cz;i++)
+        for(int i=0;i<buffered.size();i++){
 
-            pomiar[((split_cz.at(i)).toInt()-1)]=(split_buffer.at(i)).toDouble();
+            QStringList split_buffer = (buffered.at(i)).split(",",QString::SkipEmptyParts);
 
-        ui->statusBar->showMessage(QString("%1 Hz  | %2 | %3 | %4 | %5 | %6 | %7 | %8 | %9 | %10 | %11 | %12 | %13 |")
+            for(int i=0;i<ROZ;i++){//srednia z poprzedniego pomiaru
+
+                pomiar[i]=(split_buffer.at(i)).toFloat();
+                //pomiar[i]=(pomiar[i]+pomiar_old[i])/2;
+               // pomiar_old[i]=pomiar[i];
+                //qint32 tmp=qRound(pomiar[i]);
+                //pomiar[i]=tmp;
+            }
+
+            if(ui->actionstopSave->isVisible()){
+
+                static QTextStream out(&plik);
+                for(int i=0;i<ROZ;i++) out<<pomiar[i]<<" ";
+                out<<elapsed_timer.elapsed()/1000.0;
+                out<<endl;
+            }
+
+            ui->statusBar->showMessage(QString("%1 Hz     | %2 | %3 | %4 | %5 | %6 | %7 | %8 | %9 | %10 | %11 | %12 | %13 |")
                 .arg(Hz).arg(pomiar[0]).arg(pomiar[1]).arg(pomiar[2])
                 .arg(pomiar[3]).arg(pomiar[4]).arg(pomiar[5])
                 .arg(pomiar[6]).arg(pomiar[7]).arg(pomiar[8])
                 .arg(pomiar[9]).arg(pomiar[10]).arg(pomiar[11]),0);
-        update();
-   /*
-        for(int j=0;j<ilosc*2;j=j+2){// dla bufera roznej wielkosci
 
+            update();
 
-                tmp=split_buffer.at(j);
-                //test=tmp.toDouble();
-                //if(test>50&&test<200){
-                pomiar[i]=tmp.toDouble();
-                 qDebug()<<tmp;
-                i++;
-                update();
-                //tmp=split_buffer.at(j+1);
-                //pomiar[]=tmp.toDouble();
-                //out<<pomiar[0]<<"\t"<<pomiar[1]<<"\n";
-                //qDebug()<<pomiar[0]<<"\t"<<pomiar[1];
-                //}
-                //realtimeData();
-                // przetestowac poniższe
-                //  connect(&dataTimer, SIGNAL(timeout()), this, SLOT(realtimeDataSlot()));
-                //  dataTimer.start(0); // Interval 0 means to refresh as fast as possible
-
-        }*/
-        Buffer=reszta;
-
-        //tmp.clear();
-        //QTextStream out(&plik);
-        //out<<pomiar[0]<<"\t"<<pomiar[1]<<"\n";
-
+            Buffer=reszta;
+        }
     }
-
-    else if((Buffer.contains("b"))&&(Buffer.contains("c"))&&flaga_rstrt){
-
-        int miejsce=Buffer.indexOf('c');
-        Buffer=Buffer.left(miejsce);
-        miejsce=Buffer.indexOf('b');
-        Buffer=Buffer.mid(miejsce+1);
-
-        split_cz= Buffer.split(",",QString::SkipEmptyParts);
-        ilosc_cz=split_cz.count();
-        qDebug()<<split_cz;
-        qDebug()<<ilosc_cz;
-
-        flaga_rstrt=0;
-
-        for(int i=0;i<12;i++) pomiar[i]=0;
-
-        for(int i=0;i<ilosc_cz;i++)//-1 w miejscach gdzie powienien byc pomiar, w celu detekcji bledow
-
-             pomiar[((split_cz.at(i)).toInt()-1)]=-1;
-    }
-
-    else if(flaga_rstrt) writeData("rstrt");//nie wczytano które cz sa podlaczone, reset
-
+    
     static int k=0; //ilosc usunietych buferow
 
     if(Buffer.size()>160){//zbyt duzo dodanych buferow, czyscimy
@@ -407,13 +436,12 @@ void MainWindow::readData(){
         k++;
         qDebug()<<k;
 
-        if(k>10){//10 wyczyszczynoch buferow, reset mikrokontrolera
+        if(k>10){//10 wyczyszczonych buferow, reset mikrokontrolera
 
-            writeData("rstrt");
+            writeData("reset");
             k=0;
         }
     }
-
 }
 
 void MainWindow::updateHz(){
@@ -461,7 +489,48 @@ void MainWindow::initActionsConnections()
     connect(ui->actionstopSave, &QAction::triggered, this, &MainWindow::stopSave);
  }
 
+
 void MainWindow::showStatusMessage(const QString &message)
 {
     status->setText(message);
+}
+
+
+void MainWindow::on_verticalSlider_valueChanged(int value)
+{
+    linia->start->setCoords(0,(double)value);
+    linia->end->setCoords(13,(double)value);
+    ui->customPlot->replot();
+}
+
+
+void MainWindow::setupchannelbox(){
+
+    ui->channelBox->addItem(tr("Cz 1"));
+    ui->channelBox->addItem(tr("Cz 2"));
+    ui->channelBox->addItem(tr("Cz 3"));
+    ui->channelBox->addItem(tr("Cz 4"));
+    ui->channelBox->addItem(tr("Cz 5"));
+    ui->channelBox->addItem(tr("Cz 6"));
+    ui->channelBox->addItem(tr("Cz 7"));
+    ui->channelBox->addItem(tr("Cz 8"));
+    ui->channelBox->addItem(tr("Cz 9"));
+    ui->channelBox->addItem(tr("Cz 10"));
+    ui->channelBox->addItem(tr("Cz 11"));
+    ui->channelBox->addItem(tr("Cz 12"));
+}
+
+void MainWindow::on_pushButton_clicked(){
+
+    ui->customPlot2->graph(ui->channelBox->currentIndex())->addToLegend();
+    ui->customPlot2->graph(ui->channelBox->currentIndex())->setVisible(1);
+    ui->customPlot2->replot();
+}
+
+
+void MainWindow::on_pushButton_2_clicked(){
+
+    ui->customPlot2->graph(ui->channelBox->currentIndex())->setVisible(0);
+    ui->customPlot2->graph(ui->channelBox->currentIndex())->removeFromLegend();
+    ui->customPlot2->replot();
 }

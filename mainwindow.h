@@ -74,11 +74,16 @@ private slots:
     void handleError(QSerialPort::SerialPortError error);
     void updateHz();
 
+    void on_verticalSlider_valueChanged(int value);
+
+    void on_pushButton_clicked();
+
+    void on_pushButton_2_clicked();
 
 private:
     void initActionsConnections();
-
-    void realtimeData();
+    void setupchannelbox();
+    void realtimeData(QCustomPlot *customPlot);
     void showStatusMessage(const QString &message);
     void update();
     Ui::MainWindow *ui;
@@ -86,13 +91,20 @@ private:
     SettingsDialog *settings;
     QSerialPort *serial;
     QTimer *timer;
+    QElapsedTimer elapsed_timer;
     QFile plik;
+    int start_time;
     QStringList split_cz;
     double pomiar[12];
+    double pomiar_old[12];
     QByteArray Data;
     QString Buffer;
-    bool flaga_rstrt;
     int Hz_tmp,Hz,ilosc_cz;
+
+    QCPItemLine *linia;//wskazuje poziom nacisku
+    QVector<QCPBars *> plot_bars;//kazdy czujnik ma swoj slupek
+    QVector<QVector<double>> data_x;//dla plotu, x sie nie zmienia
+
 };
 
 #endif // MAINWINDOW_H

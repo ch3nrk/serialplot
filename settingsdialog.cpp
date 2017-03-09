@@ -119,11 +119,11 @@ void SettingsDialog::checkCustomDevicePathPolicy(int idx)
 
 void SettingsDialog::fillPortsParameters()
 {
-    ui->baudRateBox->addItem(QStringLiteral("9600"), QSerialPort::Baud9600);
-    ui->baudRateBox->addItem(QStringLiteral("19200"), QSerialPort::Baud19200);
-    ui->baudRateBox->addItem(QStringLiteral("38400"), QSerialPort::Baud38400);
-    ui->baudRateBox->addItem(QStringLiteral("115200"), QSerialPort::Baud115200);
-    ui->baudRateBox->addItem(tr("Custom"));
+    //ui->baudRateBox->addItem(QStringLiteral("9600"), QSerialPort::Baud9600);
+    //ui->baudRateBox->addItem(QStringLiteral("19200"), QSerialPort::Baud19200);
+    //ui->baudRateBox->addItem(QStringLiteral("38400"), QSerialPort::Baud38400);
+    //ui->baudRateBox->addItem(QStringLiteral("115200"), QSerialPort::Baud115200);
+    ui->baudRateBox->addItem(tr("2000000"));
 
     ui->dataBitsBox->addItem(QStringLiteral("5"), QSerialPort::Data5);
     ui->dataBitsBox->addItem(QStringLiteral("6"), QSerialPort::Data6);
@@ -177,7 +177,7 @@ void SettingsDialog::updateSettings()
 {
     currentSettings.name = ui->serialPortInfoListBox->currentText();
 
-    if (ui->baudRateBox->currentIndex() == 4) {
+    if (ui->baudRateBox->currentIndex() == 0) {
         currentSettings.baudRate = ui->baudRateBox->currentText().toInt();
     } else {
         currentSettings.baudRate = static_cast<QSerialPort::BaudRate>(
